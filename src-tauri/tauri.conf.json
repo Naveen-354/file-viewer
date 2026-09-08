@@ -1,0 +1,46 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "OneOpen",
+  "version": "0.1.0",
+  "identifier": "app.oneopen.desktop",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:5173",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "security": {
+      "csp": "default-src 'self'; connect-src ipc: http://ipc.localhost; img-src 'self' blob: data:; media-src 'self' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'",
+      "capabilities": ["main"]
+    },
+    "windows": [
+      {
+        "label": "main",
+        "title": "OneOpen",
+        "width": 1180,
+        "height": 760,
+        "minWidth": 720,
+        "minHeight": 480,
+        "center": true,
+        "dragDropEnabled": true
+      }
+    ]
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["msi", "nsis"],
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.ico", "icons/icon.icns"],
+    "fileAssociations": [
+      {
+        "ext": ["txt", "log", "md", "java", "kt", "kts", "js", "ts", "jsx", "tsx", "rs", "py", "sql", "yaml", "yml", "properties", "env", "json", "xml", "csv", "tsv", "png", "jpg", "jpeg", "gif", "webp", "svg", "pdf", "mp3", "wav", "ogg", "m4a", "mp4", "webm", "zip", "xlsx", "xlsm", "xlsb", "xls", "ods", "docx", "docm"],
+        "name": "OneOpen supported file",
+        "description": "Open with OneOpen",
+        "role": "Editor"
+      }
+    ],
+    "windows": {
+      "nsis": { "displayLanguageSelector": false, "installMode": "currentUser" }
+    }
+  }
+}
