@@ -50,7 +50,12 @@ pub fn edit(request: &SpreadsheetEditRequest) -> AppResult<SpreadsheetEdit> {
             ));
         }
     }
-    xlsx_edit::apply(&canonical, request.sheet_index, &request.edits)?;
+    xlsx_edit::apply(
+        &canonical,
+        request.sheet_index,
+        &request.inserts,
+        &request.edits,
+    )?;
     Ok(SpreadsheetEdit {
         file: file_detection::detect(&canonical)?,
         view: read(&canonical.to_string_lossy(), Some(request.sheet_index))?,
@@ -124,6 +129,10 @@ pub fn read(path: &str, sheet_index: Option<usize>) -> AppResult<WorkbookView> {
         }
         grid.push(cells);
     }
+    // Legacy and OpenDocument readers may not expose formulas; values still show.
+    if let Ok(formulas) = workbook.worksheet_formula(&names[active]) {
+        attach_formulas(&mut grid, &formulas, (start_row, start_column), columns);
+    }
 
     Ok(WorkbookView {
         sheets,
@@ -158,7 +167,52 @@ fn convert(value: &Data) -> SpreadsheetCell {
             "date",
         ),
     };
-    SpreadsheetCell { text, kind }
+    SpreadsheetCell {
+        text,
+        kind,
+        formula: None,
+    }
+}
+
+/// Places each formula on its cell in the grid, which starts at `origin`.
+fn attach_formulas(
+    grid: &mut [Vec<SpreadsheetCell>],
+    formulas: &calamine::Range<String>,
+    origin: (u32, u32),
+    columns: usize,
+) {
+    let Some((formula_row, formula_column)) = formulas.start() else {
+        return;
+    };
+    for (row, column, formula) in formulas.used_cells() {
+        if formula.is_empty() {
+            continue;
+        }
+        let absolute_row = formula_row as usize + row;
+        let absolute_column = formula_column as usize + column;
+        let (Some(row), Some(column)) = (
+            absolute_row.checked_sub(origin.0 as usize),
+            absolute_column.checked_sub(origin.1 as usize),
+        ) else {
+            continue;
+        };
+        if column >= columns {
+            continue;
+        }
+        let Some(cells) = grid.get_mut(row) else {
+            continue;
+        };
+        // Trailing blanks were trimmed, but a formula can evaluate to "".
+        while cells.len() <= column {
+            cells.push(convert(&Data::Empty));
+        }
+        cells[column].formula = Some(format!("={}", display_formula(formula)));
+    }
+}
+
+/// Newer functions are stored with a `_xlfn.` prefix that people never type.
+fn display_formula(formula: &str) -> String {
+    formula.replace("_xlfn._xlws.", "").replace("_xlfn.", "")
 }
 
 /// Formats a float the way a spreadsheet would: no binary-representation noise
@@ -243,6 +297,21 @@ mod tests {
     }
 
     #[test]
+    fn attaches_formulas_relative_to_the_used_range() {
+        let mut grid = vec![vec![convert(&Data::Int(1))], vec![convert(&Data::Int(2))]];
+        let mut formulas = calamine::Range::new((3, 5), (4, 6));
+        formulas.set_value((4, 6), "_xlfn.CONCAT(F4,\"x\")".to_owned());
+        attach_formulas(&mut grid, &formulas, (3, 5), 10);
+        assert_eq!(
+            grid[1].len(),
+            2,
+            "the trimmed row grows to reach the formula"
+        );
+        assert_eq!(grid[1][1].formula.as_deref(), Some("=CONCAT(F4,\"x\")"));
+        assert!(grid[0][0].formula.is_none());
+    }
+
+    #[test]
     fn only_ooxml_workbooks_accept_cell_edits() {
         let directory = assert_fs::TempDir::new().unwrap();
         let request = |name: &str| SpreadsheetEditRequest {
@@ -252,7 +321,9 @@ mod tests {
                 row: 0,
                 column: 0,
                 value: "x".into(),
+                result: None,
             }],
+            inserts: Vec::new(),
             expected_modified_ms: None,
         };
         for name in ["legacy.xls", "open.ods", "binary.xlsb", "notes.txt"] {

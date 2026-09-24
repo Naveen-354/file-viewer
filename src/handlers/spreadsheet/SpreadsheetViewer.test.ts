@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { columnName, distinctValues, isFiltered, visibleRowIndexes, type Edits } from "../../utils/spreadsheet";
+import { columnName, createCalculator, distinctValues, isFiltered, visibleRowIndexes, type Edits } from "../../utils/spreadsheet";
 import type { SpreadsheetCell } from "../../types/files";
 import { handlerFor, handlers } from "../registry";
 
@@ -38,10 +38,12 @@ describe("column filters", () => {
     [cell(""), cell("40")],
   ];
   const none: Edits = new Map();
+  const textOf = (edits: Edits) =>
+    createCalculator(rows, edits, { startRow: 0, startColumn: 0, sheet: null, recalculate: false }).text;
 
   it("keeps only rows matching every active column filter", () => {
     const filters = new Map([[0, { query: "nor", excluded: new Set<string>() }]]);
-    expect(visibleRowIndexes(rows, none, filters)).toEqual([0, 2]);
+    expect(visibleRowIndexes(rows.length, textOf(none), filters)).toEqual([0, 2]);
   });
 
   it("excludes unticked values and combines with the contains box", () => {
@@ -49,25 +51,25 @@ describe("column filters", () => {
       [0, { query: "", excluded: new Set(["South"]) }],
       [1, { query: "", excluded: new Set(["10"]) }],
     ]);
-    expect(visibleRowIndexes(rows, none, filters)).toEqual([2, 3]);
+    expect(visibleRowIndexes(rows.length, textOf(none), filters)).toEqual([2, 3]);
   });
 
   it("filters on unsaved edits rather than the value on disk", () => {
     const edits: Edits = new Map([["1:0", "North"]]);
     const filters = new Map([[0, { query: "north", excluded: new Set<string>() }]]);
-    expect(visibleRowIndexes(rows, edits, filters)).toEqual([0, 1, 2]);
+    expect(visibleRowIndexes(rows.length, textOf(edits), filters)).toEqual([0, 1, 2]);
   });
 
   it("lists distinct values from the other columns' filtered rows, blanks last", () => {
-    const { values } = distinctValues(rows, none, new Map(), 0);
+    const { values } = distinctValues(rows.length, textOf(none), new Map(), 0);
     expect(values).toEqual(["North", "South", ""]);
-    const narrowed = distinctValues(rows, none, new Map([[1, { query: "40", excluded: new Set<string>() }]]), 0);
+    const narrowed = distinctValues(rows.length, textOf(none), new Map([[1, { query: "40", excluded: new Set<string>() }]]), 0);
     expect(narrowed.values).toEqual([""]);
   });
 
   it("does not narrow its own column's choices", () => {
     const filters = new Map([[0, { query: "", excluded: new Set(["North"]) }]]);
-    expect(distinctValues(rows, none, filters, 0).values).toEqual(["North", "South", ""]);
+    expect(distinctValues(rows.length, textOf(none), filters, 0).values).toEqual(["North", "South", ""]);
   });
 
   it("treats an empty filter as inactive", () => {

@@ -318,6 +318,9 @@ pub struct SpreadsheetSheet {
 pub struct SpreadsheetCell {
     pub text: String,
     pub kind: &'static str,
+    /// The cell's formula with its leading `=`, when it has one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub formula: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -439,6 +442,34 @@ pub struct CellEdit {
     pub row: u32,
     pub column: u32,
     pub value: String,
+    /// The value the viewer computed for a formula, cached so the file reads
+    /// correctly before a spreadsheet application recalculates it.
+    #[serde(default)]
+    pub result: Option<FormulaResult>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FormulaResult {
+    pub kind: String,
+    pub text: String,
+}
+
+/// Inserts `count` empty rows or columns before the zero-based `index`,
+/// shifting everything at or after it the way a spreadsheet does.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StructuralInsert {
+    pub axis: InsertAxis,
+    pub index: u32,
+    pub count: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum InsertAxis {
+    Row,
+    Column,
 }
 
 #[derive(Debug, Deserialize)]
@@ -447,6 +478,9 @@ pub struct SpreadsheetEditRequest {
     pub path: String,
     pub sheet_index: usize,
     pub edits: Vec<CellEdit>,
+    /// Applied in order before `edits`, whose coordinates are post-insert.
+    #[serde(default)]
+    pub inserts: Vec<StructuralInsert>,
     pub expected_modified_ms: Option<u64>,
 }
 

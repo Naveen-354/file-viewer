@@ -120,7 +120,8 @@ export interface SavedWindowState { x: number; y: number; width: number; height:
 
 export type CellKind = "text" | "number" | "date" | "duration" | "boolean" | "error" | "empty";
 
-export interface SpreadsheetCell { text: string; kind: CellKind }
+/** `formula` carries the leading `=` and is only present on formula cells. */
+export interface SpreadsheetCell { text: string; kind: CellKind; formula?: string }
 
 export interface SpreadsheetSheet { index: number; name: string; hidden: boolean; selectable: boolean }
 
@@ -196,12 +197,20 @@ export interface ImageConversion {
   outputBytes: number;
 }
 
-export interface CellEdit { row: number; column: number; value: string }
+export interface FormulaResult { kind: "number" | "text" | "boolean" | "error"; text: string }
+
+/** `result` is the value computed for a formula, cached in the file on save. */
+export interface CellEdit { row: number; column: number; value: string; result?: FormulaResult }
+
+/** Inserts `count` blank rows or columns before the zero-based `index`. */
+export interface StructuralInsert { axis: "row" | "column"; index: number; count: number }
 
 export interface SpreadsheetEditRequest {
   path: string;
   sheetIndex: number;
   edits: CellEdit[];
+  /** Applied in order before `edits`, whose coordinates are post-insert. */
+  inserts?: StructuralInsert[];
   expectedModifiedMs: number | null;
 }
 

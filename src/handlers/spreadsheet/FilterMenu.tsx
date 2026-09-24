@@ -1,17 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { SpreadsheetCell } from "../../types/files";
-import { distinctValues, type ColumnFilter, type Edits } from "../../utils/spreadsheet";
+import { distinctValues, type ColumnFilter, type TextAt } from "../../utils/spreadsheet";
 
 interface Props {
-  rows: SpreadsheetCell[][];
-  edits: Edits;
+  rowCount: number;
+  textAt: TextAt;
   filters: Map<number, ColumnFilter>;
   column: number;
   onApply: (filter: ColumnFilter | null) => void;
   onClose: () => void;
 }
 
-export function FilterMenu({ rows, edits, filters, column, onApply, onClose }: Props) {
+export function FilterMenu({ rowCount, textAt, filters, column, onApply, onClose }: Props) {
   const existing = filters.get(column);
   const [query, setQuery] = useState(existing?.query ?? "");
   const [excluded, setExcluded] = useState<Set<string>>(new Set(existing?.excluded ?? []));
@@ -19,8 +18,8 @@ export function FilterMenu({ rows, edits, filters, column, onApply, onClose }: P
   const container = useRef<HTMLDivElement>(null);
 
   const { values, truncated } = useMemo(
-    () => distinctValues(rows, edits, filters, column),
-    [rows, edits, filters, column],
+    () => distinctValues(rowCount, textAt, filters, column),
+    [rowCount, textAt, filters, column],
   );
   const listed = useMemo(() => {
     const needle = search.trim().toLowerCase();

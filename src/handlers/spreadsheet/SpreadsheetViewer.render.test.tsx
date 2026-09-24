@@ -177,6 +177,106 @@ describe("SpreadsheetViewer", () => {
     expect(container.querySelector(".sheet-editor")).toBeNull();
   });
 
+  it("inserts a row where the Insert dialog says and saves it before the edits", async () => {
+    const { container, onDirtyChange } = mount();
+    await screen.findByText("Region");
+    const south = [...container.querySelectorAll(".sheet-cell")].find((c) => c.textContent === "South")!;
+    fireEvent.contextMenu(south, { clientX: 40, clientY: 40 });
+    fireEvent.click(await screen.findByRole("menuitem", { name: /^Insert…/ }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("INSERT AT A3")).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByLabelText("Entire row below"));
+    fireEvent.change(within(dialog).getByRole("spinbutton"), { target: { value: "2" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Insert" }));
+
+    await waitFor(() => expect(container.querySelectorAll(".sheet-row-number")).toHaveLength(5));
+    expect(onDirtyChange).toHaveBeenCalledWith(true);
+    const blank = container.querySelectorAll(".table-row")[3].querySelector(".sheet-cell")!;
+    fireEvent.doubleClick(blank);
+    fireEvent.change(container.querySelector(".sheet-editor")!, { target: { value: "West" } });
+    fireEvent.keyDown(container.querySelector(".sheet-editor")!, { key: "Enter" });
+
+    fireEvent.click(screen.getByRole("button", { name: /^Save/ }));
+    await waitFor(() => expect(editSpreadsheet).toHaveBeenCalledTimes(1));
+    expect(editSpreadsheet.mock.calls[0][0]).toMatchObject({
+      inserts: [{ axis: "row", index: 3, count: 2 }],
+      edits: [{ row: 3, column: 0, value: "West" }],
+    });
+  });
+
+  it("inserts a column to the left from the column header menu", async () => {
+    const { container } = mount();
+    await screen.findByText("Region");
+    const header = container.querySelectorAll(".sheet-header .header-cell")[2] as HTMLElement;
+    fireEvent.contextMenu(header, { clientX: 40, clientY: 10 });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Insert column left" }));
+    await waitFor(() => expect(container.querySelectorAll(".sheet-header .header-cell")).toHaveLength(4));
+    expect(cellsOf(container).slice(0, 3)).toEqual(["Region", "", "Units"]);
+  });
+
+  it("calculates a typed formula live and caches its result on save", async () => {
+    const { container } = mount();
+    await screen.findByText("Region");
+    const cells = [...container.querySelectorAll(".sheet-cell")];
+    fireEvent.doubleClick(cells[1]);
+    fireEvent.change(container.querySelector(".sheet-editor")!, { target: { value: "=SUM(B2:B3)" } });
+    fireEvent.keyDown(container.querySelector(".sheet-editor")!, { key: "Enter" });
+    await waitFor(() => expect(cellsOf(container)[1]).toBe("218"));
+
+    // The formula bar shows what was typed, not the result.
+    fireEvent.click(container.querySelectorAll(".sheet-cell")[1]);
+    expect((screen.getByLabelText("Formula bar") as HTMLInputElement).value).toBe("=SUM(B2:B3)");
+
+    fireEvent.click(screen.getByRole("button", { name: /^Save/ }));
+    await waitFor(() => expect(editSpreadsheet).toHaveBeenCalledTimes(1));
+    expect(editSpreadsheet.mock.calls[0][0].edits).toEqual([
+      { row: 0, column: 1, value: "=SUM(B2:B3)", result: { kind: "number", text: "218" } },
+    ]);
+  });
+
+  it("edits the selected cell from the formula bar", async () => {
+    const { container } = mount();
+    await screen.findByText("Region");
+    fireEvent.click([...container.querySelectorAll(".sheet-cell")].find((c) => c.textContent === "North")!);
+    const bar = screen.getByLabelText("Formula bar");
+    fireEvent.focus(bar);
+    fireEvent.change(bar, { target: { value: "=UPPER(A3)&\"!\"" } });
+    fireEvent.keyDown(bar, { key: "Enter" });
+    await waitFor(() => expect(cellsOf(container)).toContain("SOUTH!"));
+  });
+
+  it("starts editing with the typed key without the browser typing it twice", async () => {
+    const { container } = mount();
+    await screen.findByText("Region");
+    fireEvent.click([...container.querySelectorAll(".sheet-cell")].find((c) => c.textContent === "North")!);
+    const root = container.querySelector(".sheet-viewer")!;
+    expect(fireEvent.keyDown(root, { key: "W" })).toBe(false);
+    expect((container.querySelector(".sheet-editor") as HTMLInputElement).value).toBe("W");
+  });
+
+  it("moves the selection with Tab like Excel", async () => {
+    const { container } = mount();
+    await screen.findByText("Region");
+    fireEvent.click([...container.querySelectorAll(".sheet-cell")].find((c) => c.textContent === "North")!);
+    fireEvent.keyDown(container.querySelector(".sheet-viewer")!, { key: "Tab" });
+    expect(container.querySelector(".sheet-cell.selected")?.textContent).toBe("120");
+  });
+
+  it("resizes a row by dragging the bottom of its number", async () => {
+    const { container } = mount();
+    await screen.findByText("Region");
+    const firstRow = container.querySelector(".table-row") as HTMLElement;
+    expect(firstRow.style.height).toBe("28px");
+    fireEvent.mouseDown(firstRow.querySelector(".row-resize-handle")!, { clientY: 100 });
+    fireEvent.mouseMove(window, { clientY: 140 });
+    fireEvent.mouseUp(window);
+    await waitFor(() => expect((container.querySelector(".table-row") as HTMLElement).style.height).toBe("68px"));
+
+    fireEvent.doubleClick(container.querySelector(".row-resize-handle")!);
+    await waitFor(() => expect((container.querySelector(".table-row") as HTMLElement).style.height).toBe("28px"));
+  });
+
   it("surfaces a save failure instead of clearing the pending edits", async () => {
     editSpreadsheet.mockRejectedValue(new Error("The workbook changed outside OneOpen"));
     const { container } = mount();

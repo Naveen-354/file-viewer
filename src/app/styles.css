@@ -706,3 +706,30 @@ kbd { font-size: 9px; color: var(--muted); }
 .diff-table.split tr.added td:nth-child(-n+3) { background: var(--bg); }
 .diff-table.split tr.removed td:nth-child(n+4) { background: var(--bg); }
 @media (max-width: 860px) { .diff-files { grid-template-columns: 1fr; } }
+
+/* Spreadsheet: formula bar, row resizing, insert menu and dialog */
+.sheet-formula-bar { display: flex; flex: none; align-items: stretch; min-height: 30px; border-bottom: 1px solid var(--border); background: var(--panel); font-size: 12px; }
+.sheet-formula-address { display: flex; align-items: center; width: 74px; flex: none; padding: 0 8px; border-right: 1px solid var(--border); color: var(--muted); font-variant-numeric: tabular-nums; }
+.sheet-formula-fx { display: flex; align-items: center; padding: 0 9px; border-right: 1px solid var(--border); color: var(--muted); font-style: italic; font-weight: 650; cursor: help; user-select: none; }
+.sheet-formula-input { flex: 1; min-width: 0; padding: 0 9px; border: 0; background: transparent; color: var(--text); font: 12px "Cascadia Code", Consolas, monospace; outline: none; }
+.sheet-formula-input:focus { box-shadow: inset 0 -2px 0 var(--accent); }
+.sheet-viewer .header-cell.header-active, .sheet-row-number.header-active { background: color-mix(in srgb, var(--accent) 16%, var(--panel-2)); color: var(--text); }
+.sheet-row-number { overflow: visible; }
+.row-resize-handle { position: absolute; left: 0; right: 0; bottom: -3px; z-index: 2; height: 6px; cursor: row-resize; }
+.row-resize-handle:hover, .resize-handle:hover { background: color-mix(in srgb, var(--accent) 45%, transparent); }
+body.sheet-resizing-x, body.sheet-resizing-x * { cursor: col-resize !important; user-select: none; }
+body.sheet-resizing-y, body.sheet-resizing-y * { cursor: row-resize !important; user-select: none; }
+.sheet-cell.cell-formula { font-style: normal; box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--accent) 35%, transparent); }
+.sheet-cell.cell-formula.cell-changed { box-shadow: inset 2px 0 0 var(--accent), inset 0 -1px 0 color-mix(in srgb, var(--accent) 35%, transparent); }
+.sheet-context-menu { position: fixed; z-index: 60; display: flex; min-width: 200px; flex-direction: column; padding: 5px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel); box-shadow: var(--shadow); }
+.sheet-context-menu button { display: flex; justify-content: space-between; gap: 18px; padding: 6px 9px; border-radius: 4px; background: transparent; color: var(--text); font-size: 12px; text-align: left; }
+.sheet-context-menu button:hover, .sheet-context-menu button:focus-visible { background: var(--panel-2); }
+.sheet-context-menu button .muted { font-size: 10px; }
+.sheet-context-separator { height: 1px; margin: 4px 2px; background: var(--border); }
+.sheet-insert-modal { width: min(380px, 100%); }
+.sheet-insert-options { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 16px 22px 0; border: 0; }
+.sheet-insert-options legend { padding: 16px 0 6px; }
+.sheet-insert-option { display: flex; align-items: center; gap: 9px; padding: 6px 8px; border-radius: 5px; font-size: 12px; cursor: pointer; }
+.sheet-insert-option:hover { background: var(--panel-2); }
+.sheet-insert-option input { accent-color: var(--accent); }
+.sheet-insert-count input { width: 110px; }
