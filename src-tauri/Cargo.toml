@@ -5,6 +5,7 @@ description = "A lightweight universal desktop file workspace"
 authors = ["OneOpen contributors"]
 edition = "2021"
 rust-version = "1.77.2"
+license = "MIT"
 
 [lib]
 name = "oneopen_lib"
